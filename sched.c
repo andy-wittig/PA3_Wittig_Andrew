@@ -35,6 +35,8 @@ typedef struct _thread_data_t {
     long long int *totalSum;
 } thread_data_t;
 
+void* arraySum(void* threadData);
+
 int main(int argc, char* argv[]) //command: ./threaded_sum.c file_path number_of_threads
 {
     TERM_CLEAR();
@@ -52,7 +54,7 @@ int main(int argc, char* argv[]) //command: ./threaded_sum.c file_path number_of
     int threadsRequested;
 
     threadsRequested = atoi(argv[1]);
-    if (threadsRequested =< 0)
+    if (threadsRequested <= 0)
     {
         printf ("The number of threads requested must be more than zero, you input: %d\n", threadsRequested);
         return -1;
@@ -60,12 +62,14 @@ int main(int argc, char* argv[]) //command: ./threaded_sum.c file_path number_of
 
     //Initialize Threads
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_t* threads = malloc(sizeof(pthread_t) * threadsReq);
-    thread_data_t* mThreads = malloc(sizeof(thread_data_t) * threadsReq);
+    pthread_t* threads = malloc(sizeof(pthread_t) * threadsRequested);
+    thread_data_t* mThreads = malloc(sizeof(thread_data_t) * threadsRequested);
 
-    int currentThreadInd = 0;
+    //Seperate work for threads
+    int threadsSplit = numParsed / threadsReq;
+    int threadsRemaining = numParsed % threadsReq;
   
-    for (int i = 0; i < threadsReq; i++)
+    for (int i = 0; i < threadsRequested; i++)
     {
         int extra = (i < threadsRemaining) ? 1 : 0;
         int endThreadInd = currentThreadInd + threadsSplit + extra;
@@ -80,7 +84,7 @@ int main(int argc, char* argv[]) //command: ./threaded_sum.c file_path number_of
     }
 
     //Join and process threads
-    for (int i = 0; i < threadsReq; i++)
+    for (int i = 0; i < threadsRequested; i++)
     {
         pthread_join(threads[i], NULL);
     }
@@ -100,7 +104,7 @@ void* arraySum(void* threadData)
     while (1)
     {
         long long int tempThreadSum = 0;
-        long long latencyMax;
+        long long latencyMax = -1;
 
         for (int i = 0; i < tData->numVals; i++) //Calculate the time to process local sum -- Busy work
         {
@@ -112,8 +116,8 @@ void* arraySum(void* threadData)
             clock_gettime(CLOCK_MONOTONIC, &end);
             
             //Calculate latency
-            long long secDiff = (long long)(timespec.end->tv_sec) - (long long)(timespec.start->tv_sec);
-            long long nsecDiff = (long long)(timespec.end->tv_nsec) - (long long)(timespec.start->tv_nsec);
+            long long secDiff = (long long)(end.tv_sec - start.tv_sec);
+            long long nsecDiff = (long long)(end.tv_nsec - start.tv_nsec);
             long long currentLatency = secDiff * 1000000000LL + nsecDiff;
 
             if (currentLatency > latencyMax) { latencyMax = currentLatency; }
