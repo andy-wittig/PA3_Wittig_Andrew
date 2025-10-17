@@ -10,8 +10,8 @@
 #include <pthread.h>
 #include <time.h>
 #include <ctype.h>
-#include <string.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 
 #define ANSI_COLOR_GRAY    "\x1b[30m"
 #define ANSI_COLOR_RED     "\x1b[31m"
@@ -36,6 +36,7 @@ typedef struct _thread_data_t {
 } thread_data_t;
 
 void* arraySum(void* threadData);
+void printProgress(int localTid, size_t value);
 
 int main(int argc, char* argv[]) //command: ./threaded_sum.c file_path number_of_threads
 {
@@ -49,9 +50,14 @@ int main(int argc, char* argv[]) //command: ./threaded_sum.c file_path number_of
     }
 
     const int THREAD_ARRAY_SIZE = 2000000;
-    int numbers[THREAD_ARRAY_SIZE];
     long long int totalSum = 0;
     int threadsRequested;
+
+    int *numbers = malloc(sizeof(int) * THREAD_ARRAY_SIZE);
+    for (int i = 0; i < THREAD_ARRAY_SIZE; i++)
+    {
+        numbers[i] = 1;
+    }
 
     threadsRequested = atoi(argv[1]);
     if (threadsRequested <= 0)
@@ -65,17 +71,10 @@ int main(int argc, char* argv[]) //command: ./threaded_sum.c file_path number_of
     pthread_t* threads = malloc(sizeof(pthread_t) * threadsRequested);
     thread_data_t* mThreads = malloc(sizeof(thread_data_t) * threadsRequested);
 
-    //Seperate work for threads
-    int threadsSplit = numParsed / threadsReq;
-    int threadsRemaining = numParsed % threadsReq;
-  
     for (int i = 0; i < threadsRequested; i++)
     {
-        int extra = (i < threadsRemaining) ? 1 : 0;
-        int endThreadInd = currentThreadInd + threadsSplit + extra;
-        
         mThreads[i].localTid = i;
-        mThreads[i].data = thread[i - 1]; //Previously allocated thread
+        mThreads[i].data = numbers; //Previously allocated thread
         mThreads[i].numVals = THREAD_ARRAY_SIZE;
         mThreads[i].lock = &mutex;
         mThreads[i].totalSum = &totalSum;
@@ -90,6 +89,7 @@ int main(int argc, char* argv[]) //command: ./threaded_sum.c file_path number_of
     }
 
     //Memory cleanup
+    free(numbers);
     free(threads);
     free(mThreads);
     pthread_mutex_destroy(&mutex);
@@ -128,12 +128,12 @@ void* arraySum(void* threadData)
         *(tData->totalSum) += tempThreadSum; //Update total sum in thread_data_t
         pthread_mutex_unlock(tData->lock);
 
-        print_progress(tData->localTid, latencyMax);
+        printProgress(tData->localTid, latencyMax);
     }
     return NULL;
 }
 
-void print_progress(pid_t localTid, size_t value) {
+void printProgress(pid_t localTid, size_t value) {
         pid_t tid = syscall(__NR_gettid);
 
         TERM_GOTOXY(0,localTid+1);
